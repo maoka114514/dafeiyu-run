@@ -10,7 +10,9 @@ export function start(DATA, opts) {
   const cv = document.getElementById('c'), ctx = cv.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   const W = 960, H = 320, GY = 250;
-  const PW = 16 * S, PH = 18 * S;
+  let PW = 16 * S, PH = 18 * S;
+  const PIMG = (opts && opts.playerImg) || null;
+  if (PIMG) { PH = 76; PW = Math.round(76 * PIMG.width / PIMG.height); }
 
   const DARK = { bg: THEME.bg, fg: '#e6ecf5', dim: '#8b97a8' };
 
@@ -316,7 +318,7 @@ export function start(DATA, opts) {
 
     if (buffs.inv <= 0) {
       const dk = player.duck && player.onGround;
-      const px = player.x + 8, pw = PW - 16;
+      const px = player.x + PW * 0.28, pw = PW * 0.44;
       const py = player.y + (dk ? PH * .55 : 8);
       const ph = dk ? PH * .42 : PH - 12;
       for (const e of enemies) {
@@ -456,14 +458,17 @@ export function start(DATA, opts) {
     if (st === 'eating') ctx.rotate(0.25);
     const dk = p.duck && p.onGround;
     const sq = st === 'eating' ? 1.1 : 1;
+    const airStretch = (PIMG && !p.onGround) ? (p.vy < 0 ? 1.06 : 1.03) : 1;
     const dy = dk ? 0.58 : sq;
-    ctx.scale(1, dy);
+    ctx.scale(1 / Math.sqrt(airStretch), dy * airStretch);
     if (dk || sq !== 1) ctx.translate(0, (1 - dy) * PH / 2);
     ctx.translate(-cx, -cy);
     if (p.inv > 0 || buffs.inv > 0) ctx.globalAlpha = 0.78 + 0.22 * Math.sin(performance.now() / 90);
-    drawMap(map, p.x, p.y, S);
+    const bob = (PIMG && p.onGround && st === 'play' && p.frame) ? 1.5 : 0;
+    if (PIMG) ctx.drawImage(PIMG, p.x, p.y + bob, PW, PH);
+    else drawMap(map, p.x, p.y, S);
     ctx.globalAlpha = 1;
-    drawCostume(p.x, p.y);
+    drawCostume(p.x, p.y, PH / 18);
     ctx.restore();
   }
 

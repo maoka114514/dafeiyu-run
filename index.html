@@ -53,9 +53,12 @@ try {
   const data = { sprites, items, enemies, chapter };
   validate(data);
   const { start } = await import('./engine/game.js');
+  const pimg = new Image();
+  pimg.src = 'assets/player.png';
+  await pimg.decode().catch(() => {});
   const q = new URLSearchParams(location.search);
   const opts = (q.get('dev') === '1') ? { level: q.get('lv') ? +q.get('lv') : 0, grant: q.get('grant') ? +q.get('grant') : 0 } : {};
-  start(data, opts);
+  start(data, Object.assign({ playerImg: pimg }, opts));
 } catch (e) {
   fail(e.message || String(e));
   console.error(e);
