@@ -99,23 +99,23 @@ export function start(DATA, opts) {
 
     // 和弦垫：每小节一铺，两音就够，撑住气氛不抢戏
     if (s16 === 0) {
-      bgmNote(ch.tones[0] - 12, at, spb * 15, 'triangle', 0.016);
-      bgmNote(ch.tones[2] - 12, at, spb * 15, 'triangle', 0.010);
+      bgmNote(ch.tones[0] - 12, at, spb * 15, 'sine', 0.030);
+      bgmNote(ch.tones[2], at, spb * 15, 'sine', 0.018);
     }
     // 贝斯：一、二拍半、三拍半，走起来有推进但不密
     if (s16 === 0 || s16 === 6 || s16 === 10) {
-      bgmNote(ch.root - 12, at, spb * 3, 'triangle', 0.070);
+      bgmNote(ch.root, at, spb * 3, 'triangle', 0.130);
     }
     // 主旋律：八分音符，跳过第一拍让鼓说话
     if (s16 % 4 === 0 && s16 !== 0) {
-      bgmNote(ch.tones[(bar + s16 / 4) % 4], at, spb * 2.4, 'triangle', 0.020);
+      bgmNote(ch.tones[(bar + s16 / 4) % 4] + 12, at, spb * 2.4, 'triangle', 0.055);
     }
     // 底鼓：一、三拍
-    if (s16 === 0 || s16 === 8) bgmNote(38, at, 0.16, 'sine', 0.095);
+    if (s16 === 0 || s16 === 8) bgmNote(45, at, 0.16, 'sine', 0.150);
     // 军鼓：二、四拍，很轻
-    if (s16 === 4 || s16 === 12) bgmNoise(at, 0.09, 0.016, 2200);
+    if (s16 === 4 || s16 === 12) bgmNoise(at, 0.09, 0.030, 1800);
     // 高音镲：只在每小节第一拍，一下
-    if (s16 === 0) bgmNoise(at, 0.04, 0.005, 9000);
+    if (s16 === 0) bgmNoise(at, 0.04, 0.012, 7000);
   }
 
   function bgmSched() {
@@ -137,14 +137,14 @@ export function start(DATA, opts) {
       if (!a) return;
       if (!BGM.gain) {
         BGM.gain = a.createGain(); BGM.gain.gain.value = 0;
-        BGM.lp = a.createBiquadFilter(); BGM.lp.type = 'lowpass'; BGM.lp.frequency.value = 2400; BGM.lp.Q.value = 0.4;
+        BGM.lp = a.createBiquadFilter(); BGM.lp.type = 'lowpass'; BGM.lp.frequency.value = 3600; BGM.lp.Q.value = 0.3;
         BGM.gain.connect(BGM.lp); BGM.lp.connect(a.destination);
       }
       BGM.cfg = Object.assign({ tempo: 128, boss: false }, conf || {});
       BGM.step = 0; BGM.next = a.currentTime + 0.08; BGM.on = true;
       if (a.state === 'suspended') a.resume();
       BGM.gain.gain.cancelScheduledValues(a.currentTime);
-      BGM.gain.gain.setTargetAtTime(SAVE.mute ? 0 : 0.42, a.currentTime, 0.2);
+      BGM.gain.gain.setTargetAtTime(SAVE.mute ? 0 : 0.85, a.currentTime, 0.2);
       if (!BGM.timer) BGM.timer = setInterval(bgmSched, 25);
     } catch (e) { }
   }
@@ -159,7 +159,7 @@ export function start(DATA, opts) {
   function bgmMuteToggle() {
     SAVE.mute = !SAVE.mute; save();
     const a = ac();
-    if (a && BGM.gain) BGM.gain.gain.setTargetAtTime(SAVE.mute ? 0 : 0.42, a.currentTime, 0.05);
+    if (a && BGM.gain) BGM.gain.gain.setTargetAtTime(SAVE.mute ? 0 : 0.85, a.currentTime, 0.05);
   }
   /* ---------- 关卡 ---------- */
   const cfgOf = n => Object.assign({}, chapter.levels[n - 1]);
@@ -252,6 +252,10 @@ export function start(DATA, opts) {
     const r = cv.getBoundingClientRect();
     return { x: (ev.clientX - r.left) * (W / r.width), y: (ev.clientY - r.top) * (H / r.height) };
   }
+  const wakeAudio = () => { const a = ac(); if (a && a.state === 'suspended') a.resume(); };
+  addEventListener('pointerdown', wakeAudio, { once: false });
+  addEventListener('keydown', wakeAudio, { once: false });
+
   cv.addEventListener('pointerdown', ev => {
     ev.preventDefault();
     const p = toCanvas(ev);
@@ -540,6 +544,9 @@ export function start(DATA, opts) {
     if (cfg.boss) { ctx.fillStyle = '#e6c86a'; ctx.fillText('力竭倒计时 ' + Math.max(0, Math.ceil(cfg.dur - tSec)) + 's', W - 30, 18); }
     else { ctx.fillStyle = '#8b97a8'; ctx.fillText(String(Math.floor(score)).padStart(5, '0') + ' 分', W - 30, 18); }
 
+    ctx.textAlign = 'right'; ctx.font = '600 13px sans-serif';
+    ctx.fillStyle = SAVE.mute ? '#5a6577' : '#7fb0e8';
+    ctx.fillText(SAVE.mute ? '♪ 静音' : '♪ 音乐', W - 30, 42);
     let bx = 30; ctx.textAlign = 'left'; ctx.font = '600 13px sans-serif';
     for (const k of ['spd', 'inv', 'mag', 'slow', 'trj']) {
       if (buffs[k] > 0) {
