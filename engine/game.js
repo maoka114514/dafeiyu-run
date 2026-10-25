@@ -189,7 +189,7 @@ export function start(DATA, opts) {
         else if (r < cfg.flyP + cfg.patrolP) type = 'patrol';
         else if (r < cfg.flyP + cfg.patrolP + cfg.shotP) type = 'shot';
         const def = ENEMY_DEF[type] || {};
-        const wy = type === 'fly' ? (def.flyMin || 120) + R() * ((def.flyMax || 200) - (def.flyMin || 120)) : GY;
+        const wy = type === 'fly' ? Math.min(206, 150 + R() * 55) : GY;
         const isElite = cfg.elite && R() < 0.35;
         enemies.push({
           type, x, baseX: x, y: wy, hp: isElite ? 2 : (def.hp || 1), t: R() * 6,
@@ -326,11 +326,17 @@ export function start(DATA, opts) {
         if (e.type === 'boss') { hx = 760; hy = GY - 150; hw = 150; hh = 150; }
         else {
           const s = e.elite ? 1.5 : 1, ex = e.x - cam + 120;
-          const bw = (def.w || 24) * s, bh = (def.h || 30) * s;
-          hx = ex - bw / 2; hy = e.y - bh; hw = bw; hh = bh;
+          if (e.type === 'fly') {
+            // 飞行怪以 e.y 为中心，判定盒要和贴图对上
+            hw = 30 * s; hh = 18 * s; hx = ex - hw / 2; hy = e.y - 11 * s;
+          } else {
+            const bw = (def.w || 24) * s, bh = (def.h || 30) * s;
+            hx = ex - bw / 2; hy = e.y - bh; hw = bw; hh = bh;
+          }
         }
         if (px < hx + hw - 6 && px + pw > hx + 6 && py < hy + hh - 4 && py + ph > hy + 4) {
-          const stompable = (def.stomp !== false) && e.type !== 'boss' && player.vy > 0 && (player.y + PH - 10) <= hy + hh * .6;
+          const feet = player.y + PH;
+          const stompable = (def.stomp !== false) && e.type !== 'boss' && player.vy > -5 && feet <= hy + hh * 0.9;
           if (stompable) {
             e.hp -= 1;
             if (e.hp > 0) { e.hitT = .6; player.vy = -10.5; player.jumps = 1; player.duck = false; score += 10; shake = 2; SFX.stomp(); }
