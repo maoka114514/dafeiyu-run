@@ -15,7 +15,7 @@ export function start(DATA, opts) {
   const DARK = { bg: THEME.bg, fg: '#e6ecf5', dim: '#8b97a8' };
 
   /* ---------- 存档 ---------- */
-  const DEF = { v: 2, mute: false, pts: 0, owned: [], eq: { head: null, face: null, tail: null }, clears: {} };
+  const DEF = { v: 2, mute: false, pts: 0, owned: [], eq: { head: null, face: null, tail: null }, clears: {}, best: {} };
   let SAVE = JSON.parse(JSON.stringify(DEF));
   try {
     const raw = localStorage.getItem('dfy_save');
@@ -26,6 +26,7 @@ export function start(DATA, opts) {
     s.eq = Object.assign({}, DEF.eq, old.eq || {});
     if (!Array.isArray(s.owned)) s.owned = [];
     if (!s.clears) s.clears = {};
+    if (!s.best) s.best = {};
     s.v = 2;
     return s;
   }
@@ -167,7 +168,7 @@ export function start(DATA, opts) {
   let st = 'menu', level = 1, cfg = cfgOf(1);
   let player, enemies, bullets, pickups, pops, rice, cam, tSec, dist, target, buffs;
   let flash = 0, shake = 0, deadT = 0, winT = 0, R = Math.random, lvSel = 0;
-  let paused = false, toast = null, toastT = 0, settled = null;
+  let paused = false, toast = null, toastT = 0, settled = null, deathGain = 0;
 
   const newPlayer = () => ({ x: 120, y: GY - PH, vy: 0, onGround: true, jumps: 0, frame: 0, ft: 0, duck: false, hurt: 0, inv: 0 });
   function rng(seed) { let a = seed >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -371,6 +372,15 @@ export function start(DATA, opts) {
 
   function die() {
     if (st !== 'play') return;
+    const pg = Math.min(99, Math.floor(dist / target * 100));
+    const oldBest = SAVE.best[level] || 0;
+    deathGain = 0;
+    if (pg > oldBest) {
+      deathGain = pg - oldBest;          // 只给"进步"的那部分，防止反复刷
+      SAVE.pts += deathGain;
+      SAVE.best[level] = pg;
+      save();
+    }
     player.hurt = 1; st = 'dead'; deadT = 0; shake = 8; SFX.hit(); bgmStop();
   }
 
@@ -567,11 +577,14 @@ export function start(DATA, opts) {
     ctx.fillStyle = '#8b97a8'; ctx.font = '600 14px sans-serif';
     ctx.fillText(chapter.name || '', W / 2, 130);
     ctx.fillStyle = '#e6c86a'; ctx.font = '600 16px sans-serif';
-    ctx.fillText('积分 ' + SAVE.pts, W / 2, 160);
+    ctx.fillText('积分 ' + SAVE.pts, W / 2, 150);
+    const cleared = Object.keys(SAVE.clears).filter(k => SAVE.clears[k] > 0).length;
+    ctx.fillStyle = '#7b8799'; ctx.font = '500 13px sans-serif';
+    ctx.fillText('已通关 ' + cleared + ' / ' + LEVELS + ' 关', W / 2, 170);
 
-    const b1 = btn(W / 2 - 140, 178, 280, 42, '开始游戏');
-    const b2 = btn(W / 2 - 140, 228, 132, 36, '商城');
-    const b3 = btn(W / 2 + 8, 228, 132, 36, '换装');
+    const b1 = btn(W / 2 - 140, 188, 280, 42, '开始游戏');
+    const b2 = btn(W / 2 - 140, 238, 132, 36, '商城');
+    const b3 = btn(W / 2 + 8, 238, 132, 36, '换装');
     buttons.push({ ...b1, act: () => { st = 'levels'; lvSel = 0; SFX.ui(); } });
     buttons.push({ ...b2, act: () => { st = 'shop'; SFX.ui(); } });
     buttons.push({ ...b3, act: () => { st = 'wardrobe'; SFX.ui(); } });
@@ -663,7 +676,11 @@ export function start(DATA, opts) {
     ctx.fillStyle = '#e06a7a'; ctx.font = '700 34px "Microsoft YaHei",sans-serif';
     ctx.fillText('被撞了', W / 2, 104);
     ctx.fillStyle = '#8b97a8'; ctx.font = '500 14px sans-serif';
-    ctx.fillText('第 ' + level + ' 关  ' + (cfg.name || ''), W / 2, 134);
+    ctx.fillText('第 ' + level + ' 关  ' + (cfg.name || ''), W / 2, 132);
+    const pg = Math.min(99, Math.floor(dist / target * 100));
+    ctx.fillStyle = '#e6c86a'; ctx.font = '600 16px sans-serif';
+    ctx.fillText('本局 ' + pg + '%    最佳 ' + (SAVE.best[level] || 0) + '%', W / 2, 156);
+    if (deathGain > 0) { ctx.fillStyle = '#7fb0e8'; ctx.font = '700 18px sans-serif'; ctx.fillText('刷新进度  +' + deathGain + ' 分', W / 2, 184); }
     const a = btn(W / 2 - 160, 172, 150, 40, '重来');
     const b = btn(W / 2 + 10, 172, 150, 40, '回主界面');
     buttons.push({ ...a, act: () => startLevel(level) });
@@ -741,6 +758,7 @@ export function start(DATA, opts) {
 
     requestAnimationFrame(frame);
   }
+  if (opts && opts.grant) { SAVE.pts += opts.grant; save(); }
   if (opts && opts.level) startLevel(Math.max(1, Math.min(LEVELS, opts.level)));
   requestAnimationFrame(frame);
 }
