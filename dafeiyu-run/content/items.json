@@ -1,0 +1,11 @@
+[
+  {"id":"cat",  "slot":"head","name":"猫耳",     "price":300, "desc":"毛茸茸，会抖"},
+  {"id":"pot",  "slot":"head","name":"铁锅头盔", "price":600, "desc":"锅气十足，防不住怪"},
+  {"id":"coral","slot":"head","name":"珊瑚冠",   "price":1200,"desc":"海底贵族限定"},
+  {"id":"shade","slot":"face","name":"墨镜",     "price":300, "desc":"装酷专用"},
+  {"id":"mono", "slot":"face","name":"单片眼镜", "price":600, "desc":"学问+1"},
+  {"id":"mask", "slot":"face","name":"小口罩",   "price":1200,"desc":"社恐友好"},
+  {"id":"bell", "slot":"tail","name":"铃铛",     "price":300, "desc":"跑起来叮当"},
+  {"id":"flag", "slot":"tail","name":"小旗",     "price":600, "desc":"胜利的味道"},
+  {"id":"star", "slot":"tail","name":"星光尾环", "price":2000,"desc":"尾巴会发光"}
+]
