@@ -431,20 +431,47 @@ export function start(DATA, opts) {
     }
   }
 
-  function drawCostume(x, y, sc) {
-    sc = sc || S; const eq = SAVE.eq;
-    const px = (a, b, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x + a * sc, y + b * sc, w * sc, h * sc); };
-    if (eq.head === 'cat') { px(2, 1, 3, 3, '#2f4f7f'); px(11, 1, 3, 3, '#2f4f7f'); px(2, 0, 1, 1, '#e06a7a'); px(13, 0, 1, 1, '#e06a7a'); }
-    else if (eq.head === 'pot') { px(1, 0, 14, 5, '#8a8f98'); px(0, 4, 16, 2, '#6d7178'); px(3, 0, 3, 1, '#b6bcc6'); }
-    else if (eq.head === 'coral') { px(3, 0, 2, 3, '#e06a7a'); px(7, 0, 2, 4, '#e06a7a'); px(11, 1, 2, 2, '#e06a7a'); }
-    if (eq.face === 'shade') { px(4, 7, 8, 2, '#141a24'); px(4, 7, 3, 1, '#2b3a4a'); }
-    else if (eq.face === 'mono') { px(9, 7, 3, 3, '#cfd6e4'); px(9, 8, 3, 1, '#141a24'); px(10, 7, 1, 1, '#fff'); }
-    else if (eq.face === 'mask') { px(6, 9, 5, 3, '#cfd6e4'); }
-    if (eq.tail === 'bell') px(12, 13, 2, 2, '#e6c86a');
-    else if (eq.tail === 'flag') { px(13, 9, 1, 5, '#8b97a8'); px(14, 9, 3, 3, '#e06a7a'); }
-    else if (eq.tail === 'star') { px(13, 11, 1, 1, '#fff'); px(11, 13, 1, 1, '#fff'); px(15, 13, 1, 1, '#fff'); }
-  }
+  // 饰品：按角色贴图比例定位（0~1 归一化），换模型也不用改
+  function drawCostume(x, y, w, h) {
+    const eq = SAVE.eq;
+    const R = (nx, ny, nw, nh, c) => { ctx.fillStyle = c; ctx.fillRect(x + nx * w, y + ny * h, nw * w, nh * h); };
 
+    if (eq.head === 'cat') {
+      R(0.21, 0.10, 0.12, 0.11, '#2f4f7f'); R(0.65, 0.10, 0.12, 0.11, '#2f4f7f');
+      R(0.23, 0.075, 0.06, 0.05, '#e06a7a'); R(0.69, 0.075, 0.06, 0.05, '#e06a7a');
+    } else if (eq.head === 'pot') {
+      R(0.22, 0.085, 0.56, 0.05, '#9aa0aa');
+      R(0.16, 0.125, 0.68, 0.07, '#8a8f98');
+      R(0.12, 0.19, 0.76, 0.045, '#6d7178');
+      R(0.31, 0.055, 0.13, 0.035, '#b6bcc6');
+    } else if (eq.head === 'coral') {
+      R(0.29, 0.09, 0.06, 0.09, '#e06a7a');
+      R(0.47, 0.07, 0.06, 0.11, '#e06a7a');
+      R(0.65, 0.10, 0.06, 0.08, '#e06a7a');
+    }
+
+    if (eq.face === 'shade') {
+      R(0.31, 0.355, 0.38, 0.05, '#141a24');
+      R(0.31, 0.355, 0.12, 0.025, '#2b3a4a');
+    } else if (eq.face === 'mono') {
+      R(0.56, 0.345, 0.15, 0.07, '#dfe6f2');
+      R(0.56, 0.375, 0.15, 0.016, '#141a24');
+      R(0.585, 0.352, 0.035, 0.035, '#ffffff');
+    } else if (eq.face === 'mask') {
+      R(0.38, 0.465, 0.25, 0.08, '#dfe6f2');
+    }
+
+    if (eq.tail === 'bell') {
+      R(0.78, 0.76, 0.07, 0.07, '#e6c86a');
+    } else if (eq.tail === 'flag') {
+      R(0.755, 0.66, 0.025, 0.18, '#8b97a8');
+      R(0.78, 0.66, 0.12, 0.09, '#e06a7a');
+    } else if (eq.tail === 'star') {
+      R(0.72, 0.70, 0.04, 0.04, '#ffffff');
+      R(0.86, 0.68, 0.03, 0.03, '#ffffff');
+      R(0.79, 0.86, 0.03, 0.03, '#ffffff');
+    }
+  }
   function drawPlayer() {
     const p = player;
     let map = SPR.run0;
@@ -468,7 +495,7 @@ export function start(DATA, opts) {
     if (PIMG) ctx.drawImage(PIMG, p.x, p.y + bob, PW, PH);
     else drawMap(map, p.x, p.y, S);
     ctx.globalAlpha = 1;
-    drawCostume(p.x, p.y, PH / 18);
+    drawCostume(p.x, p.y + bob, PW, PH);
     ctx.restore();
   }
 
@@ -681,8 +708,9 @@ export function start(DATA, opts) {
     const sc = 4, w4 = 16 * sc, h4 = 18 * sc, x = W / 2 - w4 / 2, y = 104;
     ctx.fillStyle = 'rgba(0,0,0,.25)';
     ctx.beginPath(); ctx.ellipse(W / 2, y + h4 + 6, w4 * .5, 7, 0, 0, 7); ctx.fill();
-    drawMap(SPR.run0, x, y, sc);
-    drawCostume(x, y, sc);
+    if (PIMG) ctx.drawImage(PIMG, x, y, w4, h4);
+    else drawMap(SPR.run0, x, y, sc);
+    drawCostume(x, y, w4, h4);
     ctx.fillStyle = '#8b97a8'; ctx.font = '500 13px sans-serif';
     ctx.fillText('商城买到就能戴 · 点商品切换佩戴', W / 2, 296);
     const bb = btn(W / 2 - 70, 258, 140, 32, '返回');
@@ -776,6 +804,7 @@ export function start(DATA, opts) {
 
     requestAnimationFrame(frame);
   }
+  if (opts && opts.eq) { const [s, id] = opts.eq.split(':'); if (SAVE.eq[s] !== undefined) SAVE.eq[s] = id; }
   if (opts && opts.grant) { SAVE.pts += opts.grant; save(); }
   if (opts && opts.level) startLevel(Math.max(1, Math.min(LEVELS, opts.level)));
   requestAnimationFrame(frame);
