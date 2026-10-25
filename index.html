@@ -57,7 +57,7 @@ try {
   pimg.src = 'assets/player.png';
   await pimg.decode().catch(() => {});
   const q = new URLSearchParams(location.search);
-  const opts = (q.get('dev') === '1') ? { level: q.get('lv') ? +q.get('lv') : 0, grant: q.get('grant') ? +q.get('grant') : 0 } : {};
+  const opts = (q.get('dev') === '1') ? { level: q.get('lv') ? +q.get('lv') : 0, grant: q.get('grant') ? +q.get('grant') : 0, eq: q.get('eq') || '' } : {};
   start(data, Object.assign({ playerImg: pimg }, opts));
 } catch (e) {
   fail(e.message || String(e));

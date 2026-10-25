@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>大肥鱼快跑 · 无限积分版</title>
+<style>
+  html,body{margin:0;height:100%;background:#0e1118;overflow:hidden;
+    font-family:"Segoe UI","Microsoft YaHei",sans-serif;-webkit-user-select:none;user-select:none}
+  #wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+  canvas{width:min(100vw,1000px);image-rendering:pixelated;touch-action:none;cursor:pointer}
+  #err{position:fixed;left:16px;top:16px;right:16px;color:#ff8f8f;font:13px/1.6 monospace;
+       white-space:pre-wrap;background:#1a0f0f;border:1px solid #522;padding:12px;border-radius:8px;display:none}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c" width="960" height="320"></canvas></div>
+<div id="err"></div>
+<script type="module">
+const errBox = document.getElementById('err');
+const fail = (msg) => { errBox.style.display = 'block'; errBox.textContent = '加载失败：\n' + msg; };
+
+const loadJSON = async (path) => {
+  const r = await fetch(path, { cache: 'no-store' });
+  if (!r.ok) throw new Error(path + ' → HTTP ' + r.status);
+  return r.json();
+};
+
+try {
+  const [sprites, items, enemies, chapter] = await Promise.all([
+    loadJSON('../content/sprites.json'),
+    loadJSON('../content/items.json'),
+    loadJSON('../content/enemies.json'),
+    loadJSON('../content/chapter1.json'),
+  ]);
+  const { start } = await import('../engine/game.js');
+  const pimg = new Image();
+  pimg.src = '../assets/player.png';
+  await pimg.decode().catch(() => {});
+  const q = new URLSearchParams(location.search);
+  const opts = {
+    playerImg: pimg,
+    infinite: true,
+    level: (q.get('dev') === '1' && q.get('lv')) ? +q.get('lv') : 0,
+    eq: q.get('eq') || '',
+  };
+  start({ sprites, items, enemies, chapter }, opts);
+} catch (e) {
+  fail(e.message || String(e));
+  console.error(e);
+}
+</script>
+</body>
+</html>

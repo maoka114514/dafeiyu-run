@@ -4,6 +4,8 @@ export function start(DATA, opts) {
   const { sprites, items: ITEMS, enemies: ENEMY_DEF, chapter } = DATA;
   const PAL = sprites.palette, S = sprites.scale || 3;
   const SPR = { run0: sprites.run0, run1: sprites.run1, jump: sprites.jump };
+  const INF = !!(opts && opts.infinite);
+  const SAVEKEY = 'dfy_save' + (INF ? '_inf' : '');
   const THEME = chapter.theme;
   const LEVELS = chapter.levels.length;
 
@@ -20,7 +22,7 @@ export function start(DATA, opts) {
   const DEF = { v: 2, mute: false, pts: 0, owned: [], eq: { head: null, face: null, tail: null }, clears: {}, best: {} };
   let SAVE = JSON.parse(JSON.stringify(DEF));
   try {
-    const raw = localStorage.getItem('dfy_save');
+    const raw = localStorage.getItem(SAVEKEY);
     if (raw) SAVE = migrate(JSON.parse(raw));
   } catch (e) { }
   function migrate(old) {
@@ -32,7 +34,7 @@ export function start(DATA, opts) {
     s.v = 2;
     return s;
   }
-  const save = () => localStorage.setItem('dfy_save', JSON.stringify(SAVE));
+  const save = () => localStorage.setItem(SAVEKEY, JSON.stringify(SAVE));
 
   /* ---------- 音效 ---------- */
   let AC = null;
@@ -389,7 +391,7 @@ export function start(DATA, opts) {
     deathGain = 0;
     if (pg > oldBest) {
       deathGain = pg - oldBest;          // 只给"进步"的那部分，防止反复刷
-      SAVE.pts += deathGain;
+      if (!INF) SAVE.pts += deathGain;
       SAVE.best[level] = pg;
       save();
     }
@@ -622,7 +624,7 @@ export function start(DATA, opts) {
     ctx.fillStyle = '#8b97a8'; ctx.font = '600 14px sans-serif';
     ctx.fillText(chapter.name || '', W / 2, 130);
     ctx.fillStyle = '#e6c86a'; ctx.font = '600 16px sans-serif';
-    ctx.fillText('积分 ' + SAVE.pts, W / 2, 150);
+    ctx.fillText('积分 ' + (INF ? '∞' : SAVE.pts), W / 2, 150);
     const cleared = Object.keys(SAVE.clears).filter(k => SAVE.clears[k] > 0).length;
     ctx.fillStyle = '#7b8799'; ctx.font = '500 13px sans-serif';
     ctx.fillText('已通关 ' + cleared + ' / ' + LEVELS + ' 关', W / 2, 170);
@@ -667,7 +669,7 @@ export function start(DATA, opts) {
     bg(); ctx.textAlign = 'left'; ctx.fillStyle = '#eef4ff';
     ctx.font = '700 22px "Microsoft YaHei",sans-serif'; ctx.fillText('商城', 40, 46);
     ctx.textAlign = 'right'; ctx.fillStyle = '#e6c86a'; ctx.font = '600 16px sans-serif';
-    ctx.fillText('积分 ' + SAVE.pts, W - 40, 44);
+    ctx.fillText('积分 ' + (INF ? '∞' : SAVE.pts), W - 40, 44);
 
     const cw = 280, ch = 54, cols = 3, cx = W / 2 - (cols * (cw + 16) - 16) / 2;
     ITEMS.forEach((it, i) => {
@@ -696,8 +698,8 @@ export function start(DATA, opts) {
       SAVE.eq[it.slot] = SAVE.eq[it.slot] === it.id ? null : it.id;
       save(); SFX.ui(); return;
     }
-    if (SAVE.pts >= it.price) {
-      SAVE.pts -= it.price; SAVE.owned.push(it.id); SAVE.eq[it.slot] = it.id;
+    if (INF || SAVE.pts >= it.price) {
+      if (!INF) SAVE.pts -= it.price; SAVE.owned.push(it.id); SAVE.eq[it.slot] = it.id;
       save(); SFX.buy(); toast = it.name + ' 到手！'; toastT = 1.4;
     } else { SFX.hit(); toast = '积分不够'; toastT = 1.2; }
   }
@@ -743,7 +745,7 @@ export function start(DATA, opts) {
     ctx.fillStyle = '#7fb0e8'; ctx.font = '700 22px sans-serif';
     ctx.fillText('获得积分 ' + settled.gain + (settled.mult < 1 ? '（重复挑战 ×' + settled.mult + '）' : ''), W / 2, 154);
     ctx.fillStyle = '#8b97a8'; ctx.font = '500 13px sans-serif';
-    ctx.fillText('总积分 ' + SAVE.pts, W / 2, 180);
+    ctx.fillText('总积分 ' + (INF ? '∞' : SAVE.pts), W / 2, 180);
     if (level < LEVELS) {
       const a = btn(W / 2 - 170, 204, 160, 40, '下一关');
       buttons.push({ ...a, act: () => { const n = level + 1; settled = null; startLevel(n); } });
@@ -773,7 +775,7 @@ export function start(DATA, opts) {
       bg(); drawRice(); drawPlayer(); hud();
       if (winT > (chapter.goal && chapter.goal.countdownSec || 1)) {
         const s = settle();
-        SAVE.pts += s.gain; SAVE.clears[level] = (SAVE.clears[level] || 0) + 1; save();
+        if (!INF) SAVE.pts += s.gain; SAVE.clears[level] = (SAVE.clears[level] || 0) + 1; save();
         settled = s; st = 'clear'; bgmStop();
       }
     } else if (st === 'play' || st === 'dead') {
