@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -54,7 +54,7 @@ try {
   validate(data);
   const { start } = await import('./engine/game.js');
   const q = new URLSearchParams(location.search);
-  const opts = (q.get('dev') === '1' && q.get('lv')) ? { level: +q.get('lv') } : {};
+  const opts = (q.get('dev') === '1') ? { level: q.get('lv') ? +q.get('lv') : 0, grant: q.get('grant') ? +q.get('grant') : 0 } : {};
   start(data, opts);
 } catch (e) {
   fail(e.message || String(e));

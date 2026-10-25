@@ -1,4 +1,4 @@
-﻿// 大肥鱼快跑 · 引擎
+// 大肥鱼快跑 · 引擎
 // 所有内容（关卡、怪物、商品、贴图）都来自 content/*.json，这里只放规则。
 export function start(DATA, opts) {
   const { sprites, items: ITEMS, enemies: ENEMY_DEF, chapter } = DATA;
@@ -15,7 +15,7 @@ export function start(DATA, opts) {
   const DARK = { bg: THEME.bg, fg: '#e6ecf5', dim: '#8b97a8' };
 
   /* ---------- 存档 ---------- */
-  const DEF = { v: 2, pts: 0, owned: [], eq: { head: null, face: null, tail: null }, clears: {} };
+  const DEF = { v: 2, mute: false, pts: 0, owned: [], eq: { head: null, face: null, tail: null }, clears: {}, best: {} };
   let SAVE = JSON.parse(JSON.stringify(DEF));
   try {
     const raw = localStorage.getItem('dfy_save');
@@ -26,6 +26,7 @@ export function start(DATA, opts) {
     s.eq = Object.assign({}, DEF.eq, old.eq || {});
     if (!Array.isArray(s.owned)) s.owned = [];
     if (!s.clears) s.clears = {};
+    if (!s.best) s.best = {};
     s.v = 2;
     return s;
   }
@@ -55,6 +56,111 @@ export function start(DATA, opts) {
     buy: () => [880, 1170].forEach((f, i) => setTimeout(() => beep(f, .12, 'triangle', .05), i * 70))
   };
 
+  /* ---------- BGM（程序化 chiptune，无音频文件） ---------- */
+  const BGM = { on: false, timer: null, step: 0, next: 0, gain: null, cfg: null };
+  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+
+  function bgmNote(midi, at, dur, type, vol) {
+    const a = ac();
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.value = mtof(midi);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(vol, at + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g); g.connect(BGM.gain);
+    o.start(at); o.stop(at + dur + 0.02);
+  }
+  function bgmNoise(at, dur, vol, hp) {
+    const a = ac();
+    const len = Math.floor(a.sampleRate * dur);
+    const buf = a.createBuffer(1, len, a.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    const s = a.createBufferSource(); s.buffer = buf;
+    const f = a.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp || 6000;
+    const g = a.createGain(); g.gain.value = vol;
+    s.connect(f); f.connect(g); g.connect(BGM.gain);
+    s.start(at);
+  }
+
+  // 4 小节循环：Am - F - C - G，小调五声
+  const PROG = [
+    { root: 45, tones: [57, 60, 64, 69] },
+    { root: 41, tones: [53, 57, 60, 65] },
+    { root: 48, tones: [48, 52, 55, 60] },
+    { root: 43, tones: [55, 59, 62, 67] }
+  ];
+
+  function bgmStep(step, at, spb) {
+    const bar = Math.floor(step / 16) % 4;
+    const s16 = step % 16;
+    const ch = PROG[bar];
+    const boss = BGM.cfg.boss;
+
+    // 和弦垫：每小节一铺，两音就够，撑住气氛不抢戏
+    if (s16 === 0) {
+      bgmNote(ch.tones[0] - 12, at, spb * 15, 'triangle', 0.016);
+      bgmNote(ch.tones[2] - 12, at, spb * 15, 'triangle', 0.010);
+    }
+    // 贝斯：一、二拍半、三拍半，走起来有推进但不密
+    if (s16 === 0 || s16 === 6 || s16 === 10) {
+      bgmNote(ch.root - 12, at, spb * 3, 'triangle', 0.070);
+    }
+    // 主旋律：八分音符，跳过第一拍让鼓说话
+    if (s16 % 4 === 0 && s16 !== 0) {
+      bgmNote(ch.tones[(bar + s16 / 4) % 4], at, spb * 2.4, 'triangle', 0.020);
+    }
+    // 底鼓：一、三拍
+    if (s16 === 0 || s16 === 8) bgmNote(38, at, 0.16, 'sine', 0.095);
+    // 军鼓：二、四拍，很轻
+    if (s16 === 4 || s16 === 12) bgmNoise(at, 0.09, 0.016, 2200);
+    // 高音镲：只在每小节第一拍，一下
+    if (s16 === 0) bgmNoise(at, 0.04, 0.005, 9000);
+  }
+
+  function bgmSched() {
+    try {
+      const a = ac();
+      if (!a || !BGM.on) return;
+      const spb = 60 / BGM.cfg.tempo / 4;
+      while (BGM.next < a.currentTime + 0.15) {
+        bgmStep(BGM.step, BGM.next, spb);
+        BGM.step = (BGM.step + 1) % 64;
+        BGM.next += spb;
+      }
+    } catch (e) { }
+  }
+
+  function bgmStart(conf) {
+    try {
+      const a = ac();
+      if (!a) return;
+      if (!BGM.gain) {
+        BGM.gain = a.createGain(); BGM.gain.gain.value = 0;
+        BGM.lp = a.createBiquadFilter(); BGM.lp.type = 'lowpass'; BGM.lp.frequency.value = 2400; BGM.lp.Q.value = 0.4;
+        BGM.gain.connect(BGM.lp); BGM.lp.connect(a.destination);
+      }
+      BGM.cfg = Object.assign({ tempo: 128, boss: false }, conf || {});
+      BGM.step = 0; BGM.next = a.currentTime + 0.08; BGM.on = true;
+      if (a.state === 'suspended') a.resume();
+      BGM.gain.gain.cancelScheduledValues(a.currentTime);
+      BGM.gain.gain.setTargetAtTime(SAVE.mute ? 0 : 0.42, a.currentTime, 0.2);
+      if (!BGM.timer) BGM.timer = setInterval(bgmSched, 25);
+    } catch (e) { }
+  }
+  function bgmStop() {
+    try {
+      if (!BGM.on) return;
+      BGM.on = false;
+      const a = ac();
+      if (a && BGM.gain) BGM.gain.gain.setTargetAtTime(0, a.currentTime, 0.12);
+    } catch (e) { }
+  }
+  function bgmMuteToggle() {
+    SAVE.mute = !SAVE.mute; save();
+    const a = ac();
+    if (a && BGM.gain) BGM.gain.gain.setTargetAtTime(SAVE.mute ? 0 : 0.42, a.currentTime, 0.05);
+  }
   /* ---------- 关卡 ---------- */
   const cfgOf = n => Object.assign({}, chapter.levels[n - 1]);
 
@@ -62,7 +168,7 @@ export function start(DATA, opts) {
   let st = 'menu', level = 1, cfg = cfgOf(1);
   let player, enemies, bullets, pickups, pops, rice, cam, tSec, dist, target, buffs;
   let flash = 0, shake = 0, deadT = 0, winT = 0, R = Math.random, lvSel = 0;
-  let paused = false, toast = null, toastT = 0, settled = null;
+  let paused = false, toast = null, toastT = 0, settled = null, deathGain = 0;
 
   const newPlayer = () => ({ x: 120, y: GY - PH, vy: 0, onGround: true, jumps: 0, frame: 0, ft: 0, duck: false, hurt: 0, inv: 0 });
   function rng(seed) { let a = seed >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -95,6 +201,7 @@ export function start(DATA, opts) {
       rice.push({ x: target, y: GY });
     }
     st = 'play';
+    bgmStart(Object.assign({ boss: !!cfg.boss }, cfg.bgm || chapter.bgm || {}));
   }
 
   /* ---------- 输入 ---------- */
@@ -106,6 +213,7 @@ export function start(DATA, opts) {
     if (e.code === 'ArrowDown') onDive();
     if (e.code === 'Enter') onConfirm();
     if (e.code === 'Escape') onBack();
+    if (e.code === 'KeyM') bgmMuteToggle();
   });
   addEventListener('keyup', e => {
     keys[e.code] = false;
@@ -264,7 +372,16 @@ export function start(DATA, opts) {
 
   function die() {
     if (st !== 'play') return;
-    player.hurt = 1; st = 'dead'; deadT = 0; shake = 8; SFX.hit();
+    const pg = Math.min(99, Math.floor(dist / target * 100));
+    const oldBest = SAVE.best[level] || 0;
+    deathGain = 0;
+    if (pg > oldBest) {
+      deathGain = pg - oldBest;          // 只给"进步"的那部分，防止反复刷
+      SAVE.pts += deathGain;
+      SAVE.best[level] = pg;
+      save();
+    }
+    player.hurt = 1; st = 'dead'; deadT = 0; shake = 8; SFX.hit(); bgmStop();
   }
 
   function settle() {
@@ -460,17 +577,20 @@ export function start(DATA, opts) {
     ctx.fillStyle = '#8b97a8'; ctx.font = '600 14px sans-serif';
     ctx.fillText(chapter.name || '', W / 2, 130);
     ctx.fillStyle = '#e6c86a'; ctx.font = '600 16px sans-serif';
-    ctx.fillText('积分 ' + SAVE.pts, W / 2, 160);
+    ctx.fillText('积分 ' + SAVE.pts, W / 2, 150);
+    const cleared = Object.keys(SAVE.clears).filter(k => SAVE.clears[k] > 0).length;
+    ctx.fillStyle = '#7b8799'; ctx.font = '500 13px sans-serif';
+    ctx.fillText('已通关 ' + cleared + ' / ' + LEVELS + ' 关', W / 2, 170);
 
-    const b1 = btn(W / 2 - 140, 178, 280, 42, '开始游戏');
-    const b2 = btn(W / 2 - 140, 228, 132, 36, '商城');
-    const b3 = btn(W / 2 + 8, 228, 132, 36, '换装');
+    const b1 = btn(W / 2 - 140, 188, 280, 42, '开始游戏');
+    const b2 = btn(W / 2 - 140, 238, 132, 36, '商城');
+    const b3 = btn(W / 2 + 8, 238, 132, 36, '换装');
     buttons.push({ ...b1, act: () => { st = 'levels'; lvSel = 0; SFX.ui(); } });
     buttons.push({ ...b2, act: () => { st = 'shop'; SFX.ui(); } });
     buttons.push({ ...b3, act: () => { st = 'wardrobe'; SFX.ui(); } });
 
     ctx.fillStyle = '#5a6577'; ctx.font = '500 12px sans-serif';
-    ctx.fillText('空格/↑ 跳 · 空中↓ 下坠 · 地面↓ 滑铲 · ESC 暂停', W / 2, 300);
+    ctx.fillText('空格/↑ 跳 · 空中↓ 下坠 · 地面↓ 滑铲 · ESC 暂停 · M 静音', W / 2, 300);
   }
 
   function screenLevels() {
@@ -556,7 +676,11 @@ export function start(DATA, opts) {
     ctx.fillStyle = '#e06a7a'; ctx.font = '700 34px "Microsoft YaHei",sans-serif';
     ctx.fillText('被撞了', W / 2, 104);
     ctx.fillStyle = '#8b97a8'; ctx.font = '500 14px sans-serif';
-    ctx.fillText('第 ' + level + ' 关  ' + (cfg.name || ''), W / 2, 134);
+    ctx.fillText('第 ' + level + ' 关  ' + (cfg.name || ''), W / 2, 132);
+    const pg = Math.min(99, Math.floor(dist / target * 100));
+    ctx.fillStyle = '#e6c86a'; ctx.font = '600 16px sans-serif';
+    ctx.fillText('本局 ' + pg + '%    最佳 ' + (SAVE.best[level] || 0) + '%', W / 2, 156);
+    if (deathGain > 0) { ctx.fillStyle = '#7fb0e8'; ctx.font = '700 18px sans-serif'; ctx.fillText('刷新进度  +' + deathGain + ' 分', W / 2, 184); }
     const a = btn(W / 2 - 160, 172, 150, 40, '重来');
     const b = btn(W / 2 + 10, 172, 150, 40, '回主界面');
     buttons.push({ ...a, act: () => startLevel(level) });
@@ -604,7 +728,7 @@ export function start(DATA, opts) {
       if (winT > (chapter.goal && chapter.goal.countdownSec || 1)) {
         const s = settle();
         SAVE.pts += s.gain; SAVE.clears[level] = (SAVE.clears[level] || 0) + 1; save();
-        settled = s; st = 'clear';
+        settled = s; st = 'clear'; bgmStop();
       }
     } else if (st === 'play' || st === 'dead') {
       ctx.save();
@@ -634,6 +758,7 @@ export function start(DATA, opts) {
 
     requestAnimationFrame(frame);
   }
+  if (opts && opts.grant) { SAVE.pts += opts.grant; save(); }
   if (opts && opts.level) startLevel(Math.max(1, Math.min(LEVELS, opts.level)));
   requestAnimationFrame(frame);
 }

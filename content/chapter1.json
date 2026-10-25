@@ -19,9 +19,10 @@
     {"n":7, "name":"暗流",     "speed":7.3, "dur":60, "gap":180, "flyP":0.30, "patrolP":0.34, "shotP":0.27, "maxAlive":4},
     {"n":8, "name":"深沟",     "speed":7.6, "dur":60, "gap":170, "flyP":0.33, "patrolP":0.36, "shotP":0.30, "maxAlive":4},
     {"n":9, "name":"遗迹外圈", "speed":7.9, "dur":60, "gap":160, "flyP":0.35, "patrolP":0.38, "shotP":0.33, "maxAlive":5},
-    {"n":10,"name":"遗迹 · 守门","speed":8.2,"dur":60, "gap":150, "flyP":0.38, "patrolP":0.40, "shotP":0.36, "maxAlive":5, "boss":true}
+    {"n":10,"name":"遗迹 · 守门","speed":8.2,"dur":60, "gap":150, "flyP":0.38, "patrolP":0.40, "shotP":0.36, "maxAlive":5, "boss":true, "bgm": {"tempo": 152}}
   ],
   "scoring": {"base": 100, "timeBonusPerSec": 5, "noHitBonus": 200, "repeatMult": [1, 0.5, 0.2]},
+  "bgm": {"tempo": 128},
   "pickups": {"buffSeconds": 6, "threeJumpSeconds": 12, "pool": ["spd", "inv", "mag", "slow", "trj"]},
   "goal": {"kind": "rice", "countdownSec": 1}
 }
